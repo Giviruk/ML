@@ -18,20 +18,21 @@ def get_dist(p1, p2):
 
 
 colors = {
-    1: (0, 255, 0),
-    2: (0, 0, 255),
-    3: (255, 0, 255),
-    4: (0, 200, 255)
+    0: (0, 255, 0),
+    1: (0, 0, 255),
+    2: (255, 0, 255),
+    3: (0, 200, 255),
+    4: (230, 230, 250),
+    5: (240, 255, 240),
+    6: (132, 112, 255)
 }
 # Цвета (R, G, B)
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
 YELLOW = (255, 255, 0)
-radius_random = 10
-count_neighbours_for_group = 4
-radius_for_group = 30
-current_group_number = 0
+radius_random = 30
+k = 1
 
 
 def init_pygame():
@@ -44,67 +45,32 @@ def init_pygame():
     return screen
 
 
-def generate_points(point):
-    count_points = random.randint(1, 5)
-    points = []
+def generate_point(point):
+    count_points = random.randint(5, 10)
     for i in range(count_points):
-        new_x = random.randrange(point.x - radius_random + 3, point.x + radius_random + 3, 1)
-        new_y = random.randrange(point.y - radius_random + 3, point.y + radius_random + 3, 1)
+        new_x = random.randrange(point.x - radius_random + 30, point.x + radius_random + 30, 1)
+        new_y = random.randrange(point.y - radius_random + 30, point.y + radius_random + 30, 1)
         points.append(Point(new_x, new_y, point.color))
     return points
 
 
 def get_neighbours(point, points):
     neighbours = []
-    for p in points:
-        if get_dist(point, p) <= radius_for_group and p.x != point.x and p.y != point.y:
-            neighbours.append(p)
+    sorted_points = sort_points(points, point)
+    for i in range(5):
+        neighbours.append(sorted_points[i])
+
     return neighbours
 
 
-def get_group(points):
-    for point in points:
-        if point.group > 0:
-            return point.group
-    global current_group_number
-    current_group_number += 1
-    return current_group_number
-
-
-def is_border_point(points):
-    for point in points:
-        if point.group > 0:
-            return True
-    return False
-
-
-def get_color(point):
-    if point.is_border:
-        return YELLOW
-    if point.group == -1:
-        return RED
-    if point.is_border != True and point.group != -1:
-        return colors[point.group]
-
-
-def sort_points(points):
-    sorted_points = []
-    zero_point = Point(0, 0, WHITE)
+def sort_points(points, point):
     for i in range(len(points) - 1):
         for j in range(len(points)):
-            if get_dist(zero_point, points[i]) < get_dist(zero_point, points[j]):
+            if get_dist(point, points[i]) < get_dist(point, points[j]):
                 a = points[j]
                 points[j] = points[i]
                 points[i] = a
     return points
-
-
-def get_nearest(point, points):
-    nearest_point = points[0]
-    for p in points:
-        if get_dist(nearest_point, point) > get_dist(p, point) and p.x != point.x and p.y != point.y and p.group > 0:
-            nearest_point = p
-    return nearest_point
 
 
 def draw_points(points, screen):
@@ -113,33 +79,32 @@ def draw_points(points, screen):
 
 
 def draw_point(point, screen):
-    point.color = get_color(point)
     pygame.draw.circle(screen, point.color, (point.x, point.y), 3)
 
 
-def resolve_border_points(points):
-    for point in points:
-        if point.is_border:
-            nearest_point = get_nearest(point, points)
-            point.group = nearest_point.group
-            point.is_border = False
-    return points
+def init_points(screen):
+    points = []
+    for i in range(5):
+        new_points = generate_point(Point(100*i, 100*i, colors[i]))
+        for p in new_points:
+            points.append(p)
+    draw_points(points, screen)
 
 
-def clustering(points, screen):
-    for point in points:
-        neighbours = get_neighbours(point, points)
-        if len(neighbours) >= count_neighbours_for_group - 1:
-            point.group = get_group(neighbours)
-        else:
-            if is_border_point(neighbours):
-                point.is_border = True
-                point.group = get_group(neighbours)
-            else:
-                point.group = -1
-        draw_point(point, screen)
-        pygame.display.update()
-        wait(200)
+def clustering(points, point):
+    pass
+
+
+
+def test_algorithm(points, new_point):
+    global k
+    for k in range(len(points)):
+        pass
+
+
+
+def calculate_k(points):
+    pass
 
 
 if __name__ == '__main__':
@@ -148,6 +113,7 @@ if __name__ == '__main__':
     clock = pygame.time.Clock()
     screen = init_pygame()
     running = True
+    init_points(screen)
     while running:
         clock.tick(FPS)
         for event in pygame.event.get():
@@ -155,14 +121,11 @@ if __name__ == '__main__':
                 running = False
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
-                    new_points = generate_points(Point(event.pos[0], event.pos[1], WHITE))
-                    for point in new_points:
-                        pygame.draw.circle(screen, point.color, (point.x, point.y), 3)
-                    points += new_points
+                    draw_point(Point(event.pos[0], event.pos[1], WHITE), screen)
+                    pass
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 3:
-                    points = sort_points(points)
-                    clustering(points, screen)
-                    points = resolve_border_points(points)
-                    draw_points(points, screen)
+                    pass
         pygame.display.update()
+
+
