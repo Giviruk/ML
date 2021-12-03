@@ -1,197 +1,105 @@
-import random
-from math import sqrt
-
-import pygame
-import numpy as np
-from pygame.time import wait
+import random as rnd
+import sys
 
 
-class Point(object):
-    def __init__(self, x, y, color):
-        self.x = x
-        self.y = y
-        self.color = color
-        self.group = 0
-        self.is_border = False
-
-
-def get_dist(p1, p2):
-    return np.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2)
-
-
-colors = {
-    1: (0, 255, 0),
-    2: (0, 0, 255),
-    3: (255, 0, 255),
-    4: (0, 200, 255)
-}
-# Цвета (R, G, B)
-BLACK = (0, 0, 0)
-WHITE = (255, 255, 255)
-RED = (255, 0, 0)
-YELLOW = (255, 255, 0)
-radius_random = 10
-count_neighbours_for_group = 4
-radius_for_group = 30
-current_group_number = 0
-k = 0
-
-
-def init_pygame():
-    WIDTH = 360  # ширина игрового окна
-    HEIGHT = 480  # высота игрового окна
-    pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("My Game")
-    screen.fill(WHITE)
-    return screen
-
-
-def generate_points(point):
-    count_points = random.randint(1, 5)
-    points = []
-    for i in range(count_points):
-        new_x = random.randrange(point.x - radius_random + 3, point.x + radius_random + 3, 1)
-        new_y = random.randrange(point.y - radius_random + 3, point.y + radius_random + 3, 1)
-        points.append(Point(new_x, new_y, point.color))
-    return points
-
-
-def get_neighbours(point, points):
-    neighbours = []
-    for p in points:
-        if get_dist(point, p) <= radius_for_group and p.x != point.x and p.y != point.y:
-            neighbours.append(p)
-    return neighbours
-
-
-def get_group(points):
-    for point in points:
-        if point.group > 0:
-            return point.group
-    global current_group_number
-    current_group_number += 1
-    return current_group_number
-
-
-def is_border_point(points):
-    for point in points:
-        if point.group > 0:
-            return True
-    return False
-
-
-def get_color(point):
-    if point.is_border:
-        return YELLOW
-    if point.group == -1:
-        return RED
-    if point.is_border != True and point.group != -1:
-        return colors[point.group]
-
-
-def sort_points(point, points):
-    for i in range(len(points) - 1):
-        for j in range(len(points)):
-            if get_dist(point, points[i]) < get_dist(point, points[j]):
-                a = points[j]
-                points[j] = points[i]
-                points[i] = a
-    return points
-
-
-def get_nearest(point, points):
-    nearest_point = points[0]
-    for p in points:
-        if get_dist(nearest_point, point) > get_dist(p, point) and p.x != point.x and p.y != point.y and p.group > 0:
-            nearest_point = p
-    return nearest_point
-
-
-def draw_points(points, screen):
-    for point in points:
-        draw_point(point, screen)
-
-
-def draw_point(point, screen):
-    point.color = get_color(point)
-    pygame.draw.circle(screen, point.color, (point.x, point.y), 3)
-
-
-def resolve_border_points(points):
-    for point in points:
-        if point.is_border:
-            nearest_point = get_nearest(point, points)
-            point.group = nearest_point.group
-            point.is_border = False
-    return points
-
-
-def clustering(points, screen):
-    for point in points:
-        neighbours = get_neighbours(point, points)
-        if len(neighbours) >= count_neighbours_for_group - 1:
-            point.group = get_group(neighbours)
+def make_child(population):
+    first_index = rnd.randint(0, len(population)-1)
+    second_index = rnd.randint(0, len(population)-1)
+    while first_index == second_index:
+        second_index = rnd.randint(0, len(population)-1)
+    first_parent = population[first_index]
+    second_parent = population[second_index]
+    child = []
+    for i in range(0, len(first_parent)):
+        p = rnd.randint(0, 1)
+        if p == 0:
+            child.append(first_parent[i])
         else:
-            if is_border_point(neighbours):
-                point.is_border = True
-                point.group = get_group(neighbours)
-            else:
-                point.group = -1
-        draw_point(point, screen)
-        pygame.display.update()
-        wait(200)
+            child.append(second_parent[i])
+    return child
 
 
-def knn_clustering(point, points, screen):
-    global k
-    k = int(sqrt(len(points)))
-    sorted_points = sort_points(point, points)
-    nearest_neighbours = []
-    groups_count = {}
-    for i in range(k - 1):
-        nearest_neighbours.append(sorted_points[i])
-    for p in nearest_neighbours:
-        groups_count[p.group] = 0
-    for p in nearest_neighbours:
-        groups_count[p.group] += 1
-    group = max(groups_count, key=groups_count.get)
-    point.group = group
-    draw_point(point, screen)
+def make_mutation(population):
+    count = rnd.randint(0, 5)
+    was_mutation = []
+    for i in range(0, count):
+        index = rnd.randint(0, len(population)-1)
+        was_mutation.append(index)
+        mutation_index = rnd.randint(0, len(population[index])-1)
+        population[index][mutation_index] += rnd.randint(0, 10)
 
-    pass
+    return population
+
+
+def fitness(population, coefficients, answer):
+    q = {}
+    for j in range(len(population)):
+        ind = population[j]
+        ans = 0
+        for i in range(len(ind)):
+            ans += ind[i]*coefficients[i]
+        ans += coefficients[len(coefficients)-1]
+        if ans == answer:
+            return ind
+        q[j] = abs(answer - ans)
+    arr = []
+    for i in range(len(q)):
+        for j in range(0, q[i]):
+            arr.append(i)
+    values_for_delete = []
+    for i in range(0, 5):
+        index = rnd.randint(0, len(arr)-1)
+        el = arr[index]
+        values_for_delete.append(population[el])
+        while el in arr:
+            arr.remove(el)
+    for item in values_for_delete:
+        population.remove(item)
+    for i in range(0, 5):
+        population.append(make_child(population))
+    return make_mutation(population)
+
+
+def calculate_ans(individ, coeffs, ans):
+    local_ans = 0
+    for i in range(0, len(coeffs)-1):
+        local_ans += individ[i]*coeffs[i]
+    local_ans += coeffs[len(coeffs)-1]
+    return abs(ans-local_ans)
 
 
 if __name__ == '__main__':
-    points = []
-    FPS = 30  # частота кадров в секунду
-    clock = pygame.time.Clock()
-    screen = init_pygame()
-    point = 0
-    running = True
-    while running:
-        clock.tick(FPS)
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:
-                    new_points = generate_points(Point(event.pos[0], event.pos[1], BLACK))
-                    for point in new_points:
-                        pygame.draw.circle(screen, point.color, (point.x, point.y), 3)
-                    points += new_points
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 3:
-                    point = Point(event.pos[0], event.pos[1], BLACK)
-                    pygame.draw.circle(screen, point.color, (point.x, point.y), 3)
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_c:
-                    zero_point = Point(0, 0, WHITE)
-                    points = sort_points(zero_point, points)
-                    clustering(points, screen)
-                    points = resolve_border_points(points)
-                    draw_points(points, screen)
-                if event.key == pygame.K_k:
-                    knn_clustering(point, points, screen)
+    count_variables = int(input())
+    coefficients = []
+    for i in range(0, count_variables+1):
+        coefficient = int(input())
+        coefficients.append(coefficient)
+    answer = int(input())
+    max = max(max(coefficients), answer)
+    population = []
+    answer_was_found = False
+    for i in range(10):
+        new_age = []
+        for i in range(0, count_variables):
+            new_age.append(rnd.randint(1, max))
+        population.append(new_age)
+    for i in range(0, 100):
+        population = fitness(population, coefficients, answer)
+        for individ in population:
+            ans = calculate_ans(individ, coefficients, answer)
+            if ans == 0 and not answer_was_found:
+                print('answer = ')
+                print(individ)
+                answer_was_found = True
+    if not answer_was_found:
+        min_ans = sys.maxsize
+        ind = []
+        for individ in population:
+            if calculate_ans(individ, coefficients, answer) < min_ans:
+                min_ans = calculate_ans(individ, coefficients, answer)
+                ind = individ
+        print(ind)
+        print(min_ans)
 
-        pygame.display.update()
+    print("end pg")
+    a = 1
