@@ -1,11 +1,15 @@
 import cv2
-import pytesseract
+import matplotlib.pyplot as plt
 
-pytesseract.pytesseract.tesseract_cmd = r'D:\tesseract\tesseract.exe'
-img = cv2.imread('11111.png')
-img = cv2.resize(img, None, fx=9, fy=9)  # Увеличение изображения в 9 раз
-
-# Распознавание, допустимы только цифры
-balance = pytesseract.image_to_string(img, config='outputbase digits')
-
-print(balance)
+plt.show()
+image2 = cv2.imread("DdNCZC87oNQ.jpg")
+gray_img = cv2.cvtColor(image2, cv2.COLOR_BGR2GRAY)
+plt.imshow(gray_img, cmap='gray')
+plt.show()
+haar_face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_alt.xml')
+faces = haar_face_cascade.detectMultiScale(gray_img)
+print('Faces found: ', len(faces))
+for (x, y, w, h) in faces:
+    cv2.rectangle(image2, (x, y), (x+w, y+h), (0, 255, 0), 2)
+plt.imshow(image2)
+plt.show()
