@@ -1,78 +1,109 @@
-import random
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.svm._libsvm import predict
-from sklearn.datasets import make_blobs
-from matplotlib.colors import ListedColormap
 
 
-class SVM:
-    def __init__(self, c=10000, max_iter=100000):
-        self.kernel = lambda x, y: np.dot(x, y.T)
-        self.C = c
-        self.max_iter = max_iter
-
-    # ограничение параметра t, чтобы новые лямбды не покидали границ квадрата
-    def restrict_to_square(self, t, v0, u):
-        t = (np.clip(v0 + t * u, 0, self.C) - v0)[1] / u[1]
-        return (np.clip(v0 + t * u, 0, self.C) - v0)[0] / u[0]
-
-    def fit(self, X, y):
-        self.X = X.copy()
-        self.y = y * 2 - 1
-        self.lambdas = np.zeros_like(self.y, dtype=float)
-        self.K = self.kernel(self.X, self.X) * self.y[:, np.newaxis] * self.y
-
-        for _ in range(self.max_iter):
-            for idxM in range(len(self.lambdas)):
-                idxL = np.random.randint(0, len(self.lambdas))
-                Q = self.K[[[idxM, idxM], [idxL, idxL]], [[idxM, idxL], [idxM, idxL]]]
-                v0 = self.lambdas[[idxM, idxL]]
-                k0 = 1 - np.sum(self.lambdas * self.K[[idxM, idxL]], axis=1)
-                u = np.array([-self.y[idxL], self.y[idxM]])
-                t_max = np.dot(k0, u) / (np.dot(np.dot(Q, u), u) + 1E-15)
-                self.lambdas[[idxM, idxL]] = v0 + u * self.restrict_to_square(t_max, v0, u)
-
-        # найти индексы опорных векторов
-        idx, = np.nonzero(self.lambdas > 1E-15)
-        self.b = np.mean((1.0 - np.sum(self.K[idx] * self.lambdas, axis=1)) * self.y[idx])
-
-    def decision_function(self, x):
-        return np.sum(self.kernel(x, self.X) * self.y * self.lambdas, axis=1) + self.b
-
-    def predict(self, x):
-        return (np.sign(self.decision_function(x)) + 1) // 2
+class Point:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
 
 
-def draw(X, y, svm_model):
-    global xlim
-    global ylim
-    xlim = [np.min(X[:, 0]) - 1, np.max(X[:, 0]) + 1]
-    ylim = [np.min(X[:, 1]) - 1, np.max(X[:, 1]) + 1]
-    xx, yy = np.meshgrid(np.linspace(*xlim, num=500), np.linspace(*ylim, num=500))
-    rgb = np.array([[210, 0, 0], [0, 0, 150]]) / 255.0
-
-    svm_model.fit(X, y)
-    z_model = svm_model.decision_function(np.c_[xx.ravel(), yy.ravel()]).reshape(xx.shape)
-
-    plt.scatter(X[:, 0], X[:, 1], c=y, s=25, cmap='cool')
-    plt.contour(xx, yy, z_model, colors='k', levels=[-1, 0, 1], alpha=1, linestyles=['--', '.', '--'])
-    plt.contourf(xx, yy, np.sign(z_model.reshape(xx.shape)), alpha=0.3, levels=2, cmap=ListedColormap(rgb), zorder=1)
+def dist(p1, p2):
+    return np.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2)
 
 
-array, group = make_blobs(n_samples=10, centers=2, random_state=2, cluster_std=1.5)
-model = SVM(c=10, max_iter=50)
-draw(array, group, model)
-plt.show()
+def random_points(n):
+    points = []
+    for i in range(n):
+        points.append(Point(np.random.randint(0, 120), np.random.randint(0, 120)))
+    return points
 
 
-points_to_add = 10
-for _ in range(points_to_add):
-    itemX = random.uniform(xlim[0], xlim[1])
-    itemY = random.uniform(ylim[0], ylim[1])
-    item = [[itemX, itemY]]
-    array = np.append(array, item, axis=0)
-    group = model.predict(array)
-    draw(array, group, model)
-    predict()
+def get_centroids_init(points, k):
+    x = np.mean(list(map(lambda point: point.x, points)))
+    y = np.mean(list(map(lambda point: point.y, points)))
+    R = 0
+    for p in points:
+        R = max(R, dist(p, Point(x, y)))
+
+    centroids = []
+    for i in range(k):
+        centroids.append(Point(
+            x + R * np.cos(2 * np.pi * i / k),
+            y + R * np.sin(2 * np.pi * i / k)))
+    return centroids
+
+
+def get_centroid(points):
+    x = np.mean(list(map(lambda point: point.x, points)))
+    y = np.mean(list(map(lambda point: point.y, points)))
+    return Point(x, y)
+
+
+def get_probabilities(points, centroids, m):
+    matrix = [[]]
+    for i in range(len(points)):
+        if (i != 0):
+            matrix.append([])
+        for j in range(len(centroids)):
+            matrix[i].append(0)
+
+    for i in range(len(points)):
+        sum = 0
+
+        for j in range(len(centroids)):
+            matrix[i][j] = dist(points[i], centroids[j]) ** (2 / (1 - m))
+            sum = sum + matrix[i][j]
+
+        for j in range(len(centroids)):
+            matrix[i][j] = matrix[i][j] / sum
+
+    return matrix
+
+
+def get_clustering(probabilities, points, cluster_count):
+    clustering = []
+    for i in range(cluster_count):
+        clustering.append([])
+
+    for pointPropIndex in range(len(probabilities)):
+        index = probabilities[pointPropIndex].index(max(probabilities[pointPropIndex]))
+        clustering[index].append(points[pointPropIndex])
+
+    return clustering
+
+
+def show_results(clustering, centroids):
+    colors = ['magenta', 'blue', 'green', 'cyan', 'red', 'gold', 'peru', 'purple', 'orange', 'pink']
+    for cluster in clustering:
+        plt.scatter(list(map(lambda point: point.x, cluster)),
+                    list(map(lambda point: point.y, cluster)),
+                    color=colors[clustering.index(cluster)])
+
+    plt.scatter(list(map(lambda point: point.x, centroids)),
+                list(map(lambda point: point.y, centroids)),
+                color='black')
     plt.show()
+
+
+if __name__ == "__main__":
+    n = 3000
+    m = 2
+    cluster_count = 6
+
+points = random_points(n)
+centroids = get_centroids_init(points, cluster_count)
+for i in range(4):
+    probabilities = get_probabilities(points, centroids, m)
+    clustering = get_clustering(probabilities, points, cluster_count)
+
+    centroids = []
+    for cluster in clustering:
+        centroids.append(get_centroid(cluster))
+
+    show_results(clustering, centroids)
+
+
+
+
+
